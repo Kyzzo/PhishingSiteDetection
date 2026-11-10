@@ -20,14 +20,39 @@ def clean(df: pd.DataFrame, verbose: bool = True) -> pd.DataFrame:
 
     Returns numeric features plus the config.TARGET column.
     """
-    # TODO: implement
-    raise NotImplementedError
 
+    if config.RAW_TARGET not in df.columns:
+        raise KeyError(f"Expected raw target column '{config.RAW_TARGET}'" 
+                       "(1 = legitimate, 0 = phishing).")
+
+    to_drop = [col for col in config.DROP_COLUMNS if col in df.columns]
+    df = df.drop(columns=to_drop)
+
+    n_before = len(df)
+    df = df.drop_duplicates()
+
+    if verbose:
+        print(f"clean: removed {n_before - len(df)} duplicate rows")
+
+    missing = df.isna().sum()
+    missing = missing[missing > 0]
+
+    if not missing.empty:
+        raise ValueError(f"clean: found {len(missing)} columns with missing values:\n{missing}")
+
+    if not set(df[config.RAW_TARGET].unique()) <= {0, 1}:
+        raise ValueError(f"clean: expected only 0/1 values in '{config.RAW_TARGET}'")
+    df[config.TARGET] = 1 - df[config.RAW_TARGET]
+    df = df.drop(columns=[config.RAW_TARGET])
+
+    non_numeric = df.select_dtypes(exclude="number").columns.tolist()
+    if non_numeric:
+        raise ValueError(f"clean: expected all numeric columns, but found {len(non_numeric)} non-numeric:\n{non_numeric}")
+    return df
 
 def split_features_target(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
     """Return (X, y): all columns except config.TARGET, and config.TARGET."""
-    # TODO: implement
-    raise NotImplementedError
+    return df.drop(columns=[config.TARGET]), df[config.TARGET]
 
 
 def train_test(df: pd.DataFrame):
@@ -36,8 +61,8 @@ def train_test(df: pd.DataFrame):
     Use config.TEST_SIZE and config.RANDOM_STATE so everyone gets the same split.
     Hint: sklearn.model_selection.train_test_split(..., stratify=y)
     """
-    # TODO: implement
-    raise NotImplementedError
+    x, y = split_features_target(df)
+    return train_test_split(x, y, test_size=config.TEST_SIZE, random_state=config.RANDOM_STATE, stratify=y)
 
 
 def load_split():
