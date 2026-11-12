@@ -80,3 +80,32 @@ def test_feature_sets_share_the_split_and_ablated_keeps_url_features():
 def test_unknown_feature_set_fails_loudly(raw_df):
     with pytest.raises(ValueError):
         train_test(clean(raw_df, verbose=False), "nope")
+
+
+@pytest.mark.parametrize("sample_frac", [None, 0.5])
+def test_tune_refits_best_model_on_all_training_rows(raw_df, sample_frac):
+    from phishing_detection.tuning import PARAM_GRIDS, tune
+
+    X_train, X_test, y_train, _ = train_test(clean(raw_df, verbose=False))
+    for name, model in get_models().items():
+        search = tune(name, model, X_train, y_train, n_iter=2, sample_frac=sample_frac)
+        assert set(search.best_params_) <= set(PARAM_GRIDS[name])
+        best = search.best_estimator_
+        assert len(best.predict(X_test)) == len(X_test)
+        if name == "decision_tree":  # fitted on all of X_train, not just the sample
+            assert best.named_steps["clf"].tree_.n_node_samples[0] == len(X_train)
+
+
+def test_exp3_end_to_end_on_synthetic_data(raw_df, tmp_path, monkeypatch):
+    import json
+    from experiments import exp3_tuning
+
+    for attr in ("TABLES_DIR", "MODELS_DIR", "FIGURES_DIR"):
+        monkeypatch.setattr(config, attr, tmp_path)
+    monkeypatch.setattr(exp3_tuning, "load_raw", lambda: raw_df)
+    exp3_tuning.main(feature_sets=("full",), n_iter=2, sample_frac=0.5)
+
+    table = pd.read_csv(tmp_path / "exp3_tuning.csv")
+    assert len(table) == 6 and set(table["variant"]) == {"default", "tuned"}
+    assert set(json.loads((tmp_path / "exp3_best_params.json").read_text())["full"]) == set(get_models())
+    assert len(list(tmp_path.glob("exp3_full_*.joblib"))) == 3
