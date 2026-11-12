@@ -78,3 +78,30 @@ def test_exp5_reuses_saved_cnn_only_for_same_data(url_split, tmp_path, monkeypat
 
     exp5.fit_or_load_cnn("normalized", X_train.iloc[1:], y_train.iloc[1:], X_test, y_test)
     assert (tmp_path / "exp5_char_cnn_normalized.pt").stat().st_mtime_ns != saved  # data changed -> retrained
+
+
+def test_exp5_end_to_end_has_rows_for_each_feature_set(tmp_path, monkeypatch):
+    from experiments import exp5_deep_learning as exp5
+    from phishing_detection import config
+
+    rng = np.random.default_rng(0)
+    n = 200
+    label = rng.integers(0, 2, n)  # 1 = legitimate, 0 = phishing
+    raw = pd.DataFrame({c: rng.integers(0, 50, n) for c in config.URL_FEATURES})
+    raw["NoOfImage"] = rng.integers(0, 9, n)
+    raw["URL"] = [f"https://www.site{i}.com" if l else f"http://login{i}.verify.xyz/" for i, l in enumerate(label)]
+    raw["label"] = label
+
+    for attr in ("TABLES_DIR", "MODELS_DIR", "FIGURES_DIR"):
+        monkeypatch.setattr(config, attr, tmp_path)
+    monkeypatch.setattr(exp5, "load_raw", lambda: raw)
+    monkeypatch.setattr(exp5, "CharCNNClassifier", type(
+        "QuickCNN", (CharCNNClassifier,), {"__init__": lambda self, **kw: CharCNNClassifier.__init__(
+            self, **{"max_epochs": 1, "verbose": False, **kw})}))
+    exp5.main(url_modes=("normalized",))
+
+    table = pd.read_csv(tmp_path / "exp5_deep_learning.csv")
+    assert set(table["input"]) == {"engineered features (full)", "engineered features (ablated)",
+                                   "URL text (normalized)"}
+    ablated = table[table["input"] == "engineered features (ablated)"]
+    assert (ablated["n_features"] == len(config.FEATURE_SETS["ablated"])).all()
