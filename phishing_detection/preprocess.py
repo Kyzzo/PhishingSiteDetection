@@ -3,6 +3,7 @@
 Owner: Joshua (Week 1). Tests: tests/test_pipeline.py::test_clean_*, test_split_is_stratified
 """
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
 from phishing_detection import config
 
