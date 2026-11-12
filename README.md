@@ -23,7 +23,15 @@ pytest                          # tests on synthetic data (fail until the stubs 
 
 ## Running the experiments
 
-Run each command from the repo root:
+To regenerate everything in `results/` in one go:
+
+```bash
+python scripts/run_all.py            # all experiments in order, stops at the first failure
+python scripts/run_all.py --quick    # faster: fewer tuning settings, normalized URLs only
+python scripts/run_all.py --help     # --only, --skip, --keep-going, --tests
+```
+
+Or run each command from the repo root:
 
 | # | Command | Question | Outputs |
 |---|---------|----------|---------|
