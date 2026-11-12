@@ -89,6 +89,11 @@ removed (`deep.normalize_url`). The raw-URL scores are reported alongside to sho
 
 Install note: `pip install -r requirements.txt` gets the CPU build of PyTorch, which is enough here.
 
+**Saved models.** Training each CNN takes about 25 minutes on CPU. The first run saves it to
+`results/models/exp5_char_cnn_<mode>.pt` (gitignored, so each person trains once locally), and later runs
+reload it in seconds. A saved model is reused only if the training data, split and CNN settings are
+unchanged; otherwise it retrains automatically. Pass `--retrain` to force a fresh training run.
+
 ## Notes and caveats
 
 - Published results on PhiUSIIL report near-perfect accuracy. A few features, `URLSimilarityIndex` in
