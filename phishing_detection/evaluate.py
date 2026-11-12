@@ -77,7 +77,9 @@ def fit_and_evaluate(name, model, X_train, y_train, X_test, y_test, run_cv=True)
     model.fit(X_train, y_train)
     row["fit_seconds"] = time.perf_counter() - start
 
+    start = time.perf_counter()
     y_pred = model.predict(X_test)
+    row["predict_seconds"] = time.perf_counter() - start
     row.update(holdout_metrics(y_test, y_pred))
 
     return row
