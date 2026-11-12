@@ -59,3 +59,24 @@ def test_models_fit_and_evaluate(raw_df):
 def test_select_top_k(raw_df):
     X_train, _, y_train, _ = train_test(clean(raw_df, verbose=False))
     assert len(select_top_k(X_train, y_train, 2)) == 2
+
+
+def test_feature_sets_share_the_split_and_ablated_keeps_url_features():
+    rng = np.random.default_rng(1)
+    n = 100
+    label = rng.integers(0, 2, n)
+    cols = {c: rng.integers(0, 50, n) for c in config.URL_FEATURES}
+    raw = pd.DataFrame({**cols, "NoOfImage": rng.integers(0, 9, n), "label": label})
+    df = clean(raw, verbose=False)
+
+    full_train, full_test, _, _ = train_test(df, "full")
+    abl_train, abl_test, _, _ = train_test(df, "ablated")
+    assert list(abl_train.columns) == config.FEATURE_SETS["ablated"]
+    assert not set(config.ABLATED_EXCLUDE) & set(abl_train.columns)
+    assert "NoOfImage" in full_train.columns and "NoOfImage" not in abl_train.columns
+    assert full_train.index.equals(abl_train.index) and full_test.index.equals(abl_test.index)
+
+
+def test_unknown_feature_set_fails_loudly(raw_df):
+    with pytest.raises(ValueError):
+        train_test(clean(raw_df, verbose=False), "nope")
