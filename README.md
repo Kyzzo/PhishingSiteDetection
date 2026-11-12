@@ -31,6 +31,7 @@ Run each command from the repo root:
 | 2 | `python -m experiments.exp2_feature_selection --k 10 15 20` | Does a smaller feature set keep performance and cut training time? | `results/tables/exp2_feature_selection_rf.csv` |
 | 3 | `python -m experiments.exp3_tuning --n-iter 20` | How much does CV hyperparameter tuning help over the defaults? | `results/tables/exp3_tuning.csv`, `exp3_best_params.json`, `results/models/*.joblib` |
 | 4 | `python -m experiments.exp4_feature_importance` | Which features matter most? | `results/tables/exp4_feature_importance.csv`, importance plots |
+| 5 | `python -m experiments.exp5_deep_learning` | Can a deep learning model on the raw URL text match models on engineered features? | `results/tables/exp5_deep_learning.csv`, CNN training history, confusion matrices |
 
 ## Project layout
 
@@ -63,6 +64,30 @@ results/figures, results/tables, results/models
 - **Scaling** happens inside the Logistic Regression pipeline, so it is fit only on the training folds during CV.
 - **Held-out test set (20%, stratified):** we use it only for the final evaluation. All tuning and
   feature selection use the training split.
+
+## Deep learning comparison (Experiment 5)
+
+Experiment 5 adds one deep learning method, a **character-level CNN** (`deep.CharCNNClassifier`). It reads
+the URL string directly and learns its own features, so it needs no hand-engineering. Each character
+is embedded, and parallel 1-D convolutions of width 3, 5 and 7 learn substring detectors (for example
+`login`, `-secure`, `.xyz`). Global max pooling keeps each detector's strongest match anywhere in the URL.
+Training uses Adam, with early stopping on a 10% validation slice of the training set.
+
+To separate *input* from *method*, the experiment also trains a classical text baseline: TF-IDF
+character 1–5-grams fed to Logistic Regression. All five models use the same stratified split:
+
+| Model | Input | Family |
+|-------|-------|--------|
+| Logistic Regression, Decision Tree, Random Forest | engineered numeric features | classical |
+| TF-IDF + Logistic Regression | URL text | classical |
+| Char-CNN | URL text | deep learning |
+
+**URL normalization.** In PhiUSIIL every legitimate URL starts with `https://www.`, and every URL that
+ends in `/` is phishing. On raw URLs, a text model can score about 99% from those characters alone.
+By default the text models therefore see URLs with the scheme, a leading `www.` and trailing slashes
+removed (`deep.normalize_url`). The raw-URL scores are reported alongside to show the size of that shortcut.
+
+Install note: `pip install -r requirements.txt` gets the CPU build of PyTorch, which is enough here.
 
 ## Notes and caveats
 
