@@ -9,7 +9,7 @@ def main():
     # TODO:
     #   1. Load the stratified split (preprocess.load_split).
     #   2. For each model in models.get_models(): fit_and_evaluate, then save a
-    #      confusion matrix to results/figures/.
+    #      confusion matrix to results/figures/exp1/ (config.figures_dir("exp1")).
     #   3. Save all rows with save_table("exp1_full_features.csv") and print a summary.
     raise NotImplementedError
 

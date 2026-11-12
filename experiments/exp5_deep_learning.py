@@ -33,8 +33,8 @@ from phishing_detection.evaluate import fit_and_evaluate, holdout_metrics, plot_
 from phishing_detection.models import get_models
 from phishing_detection.preprocess import clean, train_test
 
-COLUMNS = ["model", "family", "input", "n_features", "accuracy", "precision", "recall", "f1",
-           "tn", "fp", "fn", "tp", "fit_seconds", "predict_seconds", "n_parameters"]
+COLUMNS = ["model", "family", "input", "threshold", "n_features", "accuracy", "precision", "recall",
+           "f1", "tn", "fp", "fn", "tp", "fit_seconds", "predict_seconds", "n_parameters"]
 
 
 def split_fingerprint(U_train, y_train) -> str:
@@ -78,6 +78,7 @@ def main(url_modes=("normalized", "raw"), skip_tabular=False, retrain=False,
     X_train, X_test, y_train, y_test = train_test(cleaned)
     urls = raw.loc[X_train.index.union(X_test.index), "URL"]
     rows = []
+    figures = config.figures_dir("exp5")  # one confusion matrix per row of the results table
 
     for feature_set in [] if skip_tabular else feature_sets:
         F_train, F_test, _, _ = train_test(cleaned, feature_set)
@@ -92,6 +93,8 @@ def main(url_modes=("normalized", "raw"), skip_tabular=False, retrain=False,
             else:
                 row["n_parameters"] = clf.coef_.size + clf.intercept_.size
             rows.append({**row, "family": "classical", "input": f"engineered features ({feature_set})"})
+            plot_confusion_matrix(model, F_test, y_test, f"{name} ({feature_set} features)",
+                                  figures / f"exp5_cm_{name}_{feature_set}.png")
 
     for mode in url_modes:
         U_train = url_frame(urls.loc[X_train.index], normalize=mode == "normalized")
@@ -107,15 +110,26 @@ def main(url_modes=("normalized", "raw"), skip_tabular=False, retrain=False,
         print(f"[text/{mode}] char_cnn")
         cnn, row = fit_or_load_cnn(mode, U_train, y_train, U_test, y_test, retrain)
         row["n_parameters"] = cnn.n_parameters()
-        rows.append({**row, "family": "deep learning", "input": f"URL text ({mode})"})
+        # Two rows: the usual 0.5 cutoff (like-for-like with TF-IDF, which also uses 0.5) and
+        # the cutoff chosen on the CNN's validation slice. Both are scored once on the test set.
+        p_test = cnn.predict_proba(U_test)[:, 1]
+        for label, threshold, suffix in [("char_cnn", 0.5, "t0.50"),
+                                         ("char_cnn (val threshold)", cnn.threshold_, "val_threshold")]:
+            y_pred = (p_test >= threshold).astype(int)
+            rows.append({**row, **holdout_metrics(y_test, y_pred),
+                         "model": label, "threshold": threshold,
+                         "family": "deep learning", "input": f"URL text ({mode})"})
+            plot_confusion_matrix(cnn, U_test, y_test, f"char_cnn, threshold {threshold:.2f} (URL {mode})",
+                                  figures / f"exp5_cm_char_cnn_{mode}_{suffix}.png", y_pred=y_pred)
         pd.DataFrame(cnn.history_).to_csv(
             config.TABLES_DIR / f"exp5_char_cnn_history_{mode}.csv", index=False)
 
-        for name, model in [("tfidf_logreg", tfidf), ("char_cnn", cnn)]:
-            plot_confusion_matrix(model, U_test, y_test, f"{name} (URL {mode})",
-                                  config.FIGURES_DIR / f"exp5_cm_{name}_{mode}.png")
+        plot_confusion_matrix(tfidf, U_test, y_test, f"tfidf_logreg (URL {mode})",
+                              figures / f"exp5_cm_tfidf_logreg_{mode}.png")
 
-    df = save_table(pd.DataFrame(rows)[COLUMNS], "exp5_deep_learning.csv")
+    table = pd.DataFrame(rows).reindex(columns=COLUMNS)
+    table["threshold"] = table["threshold"].fillna(0.5)  # every other model uses the usual cutoff
+    df = save_table(table, "exp5_deep_learning.csv")
     with pd.option_context("display.width", 200, "display.float_format", "{:.4f}".format):
         print(df.drop(columns=["tn", "fp", "tp"]).to_string(index=False))
 

@@ -85,12 +85,18 @@ def fit_and_evaluate(name, model, X_train, y_train, X_test, y_test, run_cv=True)
     return row
 
 
-def plot_confusion_matrix(model, X_test, y_test, title: str, path: Path) -> None:
-    """Save a confusion-matrix figure with classes labeled Legitimate / Phishing."""
+def plot_confusion_matrix(model, X_test, y_test, title: str, path: Path, y_pred=None) -> None:
+    """Save a confusion-matrix figure with classes labeled Legitimate / Phishing.
+
+    Counts are drawn as whole numbers (20028, not 2e+04). Pass y_pred to plot given
+    predictions instead of calling model.predict (e.g. a model at a different threshold).
+    """
     fig, ax = plt.subplots(figsize=(5, 4))
-    ConfusionMatrixDisplay.from_estimator(
-        model, X_test, y_test, display_labels=["Legitimate", "Phishing"], ax=ax, colorbar=False
-    )
+    style = dict(display_labels=["Legitimate", "Phishing"], ax=ax, colorbar=False, values_format="d")
+    if y_pred is None:
+        ConfusionMatrixDisplay.from_estimator(model, X_test, y_test, **style)
+    else:
+        ConfusionMatrixDisplay.from_predictions(y_test, y_pred, labels=[0, 1], **style)
     ax.set_title(title)
     fig.tight_layout()
     path.parent.mkdir(parents=True, exist_ok=True)

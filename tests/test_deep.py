@@ -57,7 +57,20 @@ def test_char_cnn_save_load_roundtrip(url_split, tmp_path):
     cnn.save(tmp_path / "cnn.pt", note="hi")
     loaded, meta = CharCNNClassifier.load(tmp_path / "cnn.pt")
     assert meta == {"note": "hi"}
+    assert loaded.threshold_ == cnn.threshold_
     assert np.allclose(loaded.predict_proba(X_test), cnn.predict_proba(X_test), atol=1e-6)
+    assert (loaded.predict(X_test) == cnn.predict(X_test)).all()
+
+
+def test_char_cnn_threshold_auto_or_fixed(url_split):
+    X_train, X_test, y_train, _ = url_split
+    auto = CharCNNClassifier(max_epochs=1, verbose=False).fit(X_train, y_train)
+    assert 0.05 <= auto.threshold_ <= 0.95
+    p = auto.predict_proba(X_test)[:, 1]
+    assert (auto.predict(X_test) == (p >= auto.threshold_)).all()
+
+    fixed = CharCNNClassifier(max_epochs=1, threshold=0.5, verbose=False).fit(X_train, y_train)
+    assert fixed.threshold_ == 0.5
 
 
 def test_exp5_reuses_saved_cnn_only_for_same_data(url_split, tmp_path, monkeypatch):
@@ -105,3 +118,13 @@ def test_exp5_end_to_end_has_rows_for_each_feature_set(tmp_path, monkeypatch):
                                    "URL text (normalized)"}
     ablated = table[table["input"] == "engineered features (ablated)"]
     assert (ablated["n_features"] == len(config.FEATURE_SETS["ablated"])).all()
+    cnn_rows = table[table["family"] == "deep learning"]
+    assert list(cnn_rows["model"]) == ["char_cnn", "char_cnn (val threshold)"]
+    assert cnn_rows["threshold"].iloc[0] == 0.5
+    assert (table.loc[table["family"] == "classical", "threshold"] == 0.5).all()
+    # one confusion matrix per row, all in results/figures/exp5/
+    images = sorted(p.name for p in (tmp_path / "exp5").glob("*.png"))
+    assert len(images) == len(table) == 9
+    assert "exp5_cm_char_cnn_normalized_t0.50.png" in images
+    assert "exp5_cm_char_cnn_normalized_val_threshold.png" in images
+    assert not list(tmp_path.glob("*.png"))  # nothing left in the top-level figures folder
