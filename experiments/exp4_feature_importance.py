@@ -12,7 +12,8 @@ def main():
     #   2. Compute at least two views of importance, e.g. tree impurity
     #      importance and permutation importance on the test set, plus
     #      standardized Logistic Regression coefficients for comparison.
-    #   3. Save a table and bar charts of the top features to results/.
+    #   3. Save a table to results/tables/ and bar charts of the top features to
+    #      results/figures/exp4/ (config.figures_dir("exp4")).
     raise NotImplementedError
 
 

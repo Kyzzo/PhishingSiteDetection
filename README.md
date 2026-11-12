@@ -35,11 +35,11 @@ Or run each command from the repo root:
 
 | # | Command | Question | Outputs |
 |---|---------|----------|---------|
-| 1 | `python -m experiments.exp1_full_features` | Which model works best on all usable features? | `results/tables/exp1_full_features.csv`, confusion matrices |
+| 1 | `python -m experiments.exp1_full_features` | Which model works best on all usable features? | `results/tables/exp1_full_features.csv`, confusion matrices in `results/figures/exp1/` |
 | 2 | `python -m experiments.exp2_feature_selection --k 10 15 20` | Does a smaller feature set keep performance and cut training time? | `results/tables/exp2_feature_selection_rf.csv` |
-| 3 | `python -m experiments.exp3_tuning --n-iter 20` | How much does CV hyperparameter tuning help over the defaults? | `results/tables/exp3_tuning.csv`, `exp3_best_params.json`, `results/models/*.joblib` |
-| 4 | `python -m experiments.exp4_feature_importance` | Which features matter most? | `results/tables/exp4_feature_importance.csv`, importance plots |
-| 5 | `python -m experiments.exp5_deep_learning` | Can a deep learning model on the raw URL text match models on engineered features? | `results/tables/exp5_deep_learning.csv`, CNN training history, confusion matrices |
+| 3 | `python -m experiments.exp3_tuning --n-iter 20` | How much does CV hyperparameter tuning help over the defaults? | `results/tables/exp3_tuning.csv`, `exp3_best_params.json`, `results/models/*.joblib`, confusion matrices in `results/figures/exp3/` |
+| 4 | `python -m experiments.exp4_feature_importance` | Which features matter most? | `results/tables/exp4_feature_importance.csv`, importance plots in `results/figures/exp4/` |
+| 5 | `python -m experiments.exp5_deep_learning` | Can a deep learning model on the raw URL text match models on engineered features? | `results/tables/exp5_deep_learning.csv`, CNN training history, a confusion matrix for every model in `results/figures/exp5/` |
 
 ## Project layout
 
@@ -57,7 +57,7 @@ scripts/download_data.py
 notebooks/              EDA and scratch work
 tests/                  pytest smoke tests
 data/raw, data/processed    (gitignored)
-results/figures, results/tables, results/models
+results/figures/<exp>/, results/tables, results/models   (one figures folder per experiment)
 ```
 
 ## Preprocessing decisions (the spec for `preprocess.py`)
@@ -79,7 +79,12 @@ Experiment 5 adds one deep learning method, a **character-level CNN** (`deep.Cha
 the URL string directly and learns its own features, so it needs no hand-engineering. Each character
 is embedded, and parallel 1-D convolutions of width 3, 5 and 7 learn substring detectors (for example
 `login`, `-secure`, `.xyz`). Global max pooling keeps each detector's strongest match anywhere in the URL.
-Training uses Adam, with early stopping on a 10% validation slice of the training set.
+Training uses Adam for up to 15 epochs, with early stopping on a 10% validation slice of the training set.
+
+**Decision threshold.** The CNN's precision is far above its recall at the usual 0.5 cutoff on P(phishing),
+and this project weighs recall. So after training, the CNN picks the cutoff that maximizes F1 on its
+validation slice (never on the test set). The results table reports the CNN twice: at 0.5, like-for-like
+with the other models, and at the validation-chosen threshold (`threshold` column).
 
 To separate *input* from *method*, the experiment also trains a classical text baseline: TF-IDF
 character 1–5-grams fed to Logistic Regression. All five models use the same stratified split:
@@ -96,6 +101,9 @@ By default the text models therefore see URLs with the scheme, a leading `www.` 
 removed (`deep.normalize_url`). The raw-URL scores are reported alongside to show the size of that shortcut.
 
 Install note: `pip install -r requirements.txt` gets the CPU build of PyTorch, which is enough here.
+With an NVIDIA GPU the CNN trains several times faster; the code uses it automatically if PyTorch has
+CUDA. Pick the CUDA build that your driver supports (`nvidia-smi` shows the CUDA version), e.g. for CUDA 12.4:
+`pip install "torch==2.6.0+cu124" --index-url https://download.pytorch.org/whl/cu124 --extra-index-url https://pypi.org/simple`.
 
 **Saved models.** Training each CNN takes about 25 minutes on CPU. The first run saves it to
 `results/models/exp5_char_cnn_<mode>.pt` (gitignored, so each person trains once locally), and later runs

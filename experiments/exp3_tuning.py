@@ -14,7 +14,7 @@ Outputs:
   results/tables/exp3_tuning.csv          default vs tuned, CV and test metrics
   results/tables/exp3_best_params.json    best settings per feature set and model
   results/models/exp3_<set>_<model>.joblib  tuned, fitted models (for Experiment 4)
-  results/figures/exp3_cm_<set>_<model>.png confusion matrices of the tuned models
+  results/figures/exp3/exp3_cm_<set>_<model>.png confusion matrices of the tuned models
 """
 import argparse
 import json
@@ -72,7 +72,7 @@ def main(feature_sets=("full", "ablated"), n_iter=20, sample_frac=0.3):
 
             joblib.dump(tuned, config.MODELS_DIR / f"exp3_{feature_set}_{name}.joblib")
             plot_confusion_matrix(tuned, X_test, y_test, f"{name}, tuned ({feature_set} features)",
-                                  config.FIGURES_DIR / f"exp3_cm_{feature_set}_{name}.png")
+                                  config.figures_dir("exp3") / f"exp3_cm_{feature_set}_{name}.png")
 
     df = save_table(pd.DataFrame(rows).reindex(columns=COLUMNS), "exp3_tuning.csv")
     (config.TABLES_DIR / "exp3_best_params.json").write_text(json.dumps(best_params, indent=2))

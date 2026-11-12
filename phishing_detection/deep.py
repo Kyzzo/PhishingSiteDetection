@@ -67,12 +67,15 @@ class CharCNNClassifier(ClassifierMixin, BaseEstimator):
     anywhere in the URL, and a small dense head outputs P(phishing).
 
     10% of the training data is held out for early stopping on F1, so fit() never
-    sees the test set.
+    sees the test set. The same held-out slice picks the decision threshold: with
+    threshold="auto", fit() chooses the cutoff on P(phishing) that maximizes F1 there
+    (stored as threshold_); a number fixes it instead (0.5 = the usual cutoff).
     """
 
     def __init__(self, max_len=200, embed_dim=32, n_filters=128, kernel_sizes=(3, 5, 7),
-                 hidden=64, dropout=0.5, lr=1e-3, batch_size=512, max_epochs=10,
-                 patience=2, val_fraction=0.1, random_state=config.RANDOM_STATE, verbose=True):
+                 hidden=64, dropout=0.5, lr=1e-3, batch_size=512, max_epochs=15,
+                 patience=2, val_fraction=0.1, threshold="auto", random_state=config.RANDOM_STATE,
+                 verbose=True):
         self.max_len = max_len
         self.embed_dim = embed_dim
         self.n_filters = n_filters
@@ -84,6 +87,7 @@ class CharCNNClassifier(ClassifierMixin, BaseEstimator):
         self.max_epochs = max_epochs
         self.patience = patience
         self.val_fraction = val_fraction
+        self.threshold = threshold
         self.random_state = random_state
         self.verbose = verbose
 
@@ -181,14 +185,25 @@ class CharCNNClassifier(ClassifierMixin, BaseEstimator):
                     break
         self.model_.load_state_dict(best_state)
         self.best_val_f1_ = best_f1
+        self.threshold_ = self._choose_threshold(y[va], self._proba(ids[va]))
+        if self.verbose:
+            print(f"  decision threshold {self.threshold_:.2f} (chosen on the validation slice)")
         return self
+
+    def _choose_threshold(self, y_val, p_val) -> float:
+        """The fixed threshold, or with "auto" the cutoff that maximizes F1 on the validation slice."""
+        if self.threshold != "auto":
+            return float(self.threshold)
+        candidates = np.round(np.arange(0.05, 0.96, 0.01), 2)
+        scores = [f1_score(y_val, p_val >= t, zero_division=0) for t in candidates]
+        return float(candidates[int(np.argmax(scores))])
 
     def predict_proba(self, X) -> np.ndarray:
         p = self._proba(self._encode(X))
         return np.column_stack([1 - p, p])
 
     def predict(self, X) -> np.ndarray:
-        return (self.predict_proba(X)[:, 1] >= 0.5).astype(int)
+        return (self.predict_proba(X)[:, 1] >= self.threshold_).astype(int)
 
     def n_parameters(self) -> int:
         return sum(p.numel() for p in self.model_.parameters())
@@ -198,7 +213,8 @@ class CharCNNClassifier(ClassifierMixin, BaseEstimator):
         import torch
 
         torch.save({"params": self.get_params(), "state_dict": self.model_.state_dict(),
-                    "history": self.history_, "best_val_f1": self.best_val_f1_, "meta": meta}, path)
+                    "history": self.history_, "best_val_f1": self.best_val_f1_,
+                    "threshold": self.threshold_, "meta": meta}, path)
 
     @classmethod
     def load(cls, path):
@@ -213,4 +229,5 @@ class CharCNNClassifier(ClassifierMixin, BaseEstimator):
         model.model_.load_state_dict(checkpoint["state_dict"])
         model.history_ = checkpoint["history"]
         model.best_val_f1_ = checkpoint["best_val_f1"]
+        model.threshold_ = checkpoint.get("threshold", 0.5)
         return model, checkpoint["meta"]

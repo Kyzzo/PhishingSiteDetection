@@ -7,6 +7,11 @@ RAW_DIR = DATA_DIR / "raw"
 PROCESSED_DIR = DATA_DIR / "processed"
 RESULTS_DIR = ROOT / "results"
 FIGURES_DIR = RESULTS_DIR / "figures"
+
+
+def figures_dir(experiment: str) -> Path:
+    """results/figures/<experiment>/ (e.g. "exp3"); each experiment keeps its images in its own folder."""
+    return FIGURES_DIR / experiment
 TABLES_DIR = RESULTS_DIR / "tables"
 MODELS_DIR = RESULTS_DIR / "models"
 

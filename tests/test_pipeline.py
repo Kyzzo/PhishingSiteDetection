@@ -109,3 +109,4 @@ def test_exp3_end_to_end_on_synthetic_data(raw_df, tmp_path, monkeypatch):
     assert len(table) == 6 and set(table["variant"]) == {"default", "tuned"}
     assert set(json.loads((tmp_path / "exp3_best_params.json").read_text())["full"]) == set(get_models())
     assert len(list(tmp_path.glob("exp3_full_*.joblib"))) == 3
+    assert len(list((tmp_path / "exp3").glob("exp3_cm_full_*.png"))) == 3
