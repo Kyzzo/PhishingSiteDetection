@@ -49,3 +49,32 @@ def test_char_cnn_proba_shape(url_split):
     proba = cnn.predict_proba(X_test)
     assert proba.shape == (len(X_test), 2)
     assert np.allclose(proba.sum(axis=1), 1)
+
+
+def test_char_cnn_save_load_roundtrip(url_split, tmp_path):
+    X_train, X_test, y_train, _ = url_split
+    cnn = CharCNNClassifier(max_epochs=1, verbose=False).fit(X_train, y_train)
+    cnn.save(tmp_path / "cnn.pt", note="hi")
+    loaded, meta = CharCNNClassifier.load(tmp_path / "cnn.pt")
+    assert meta == {"note": "hi"}
+    assert np.allclose(loaded.predict_proba(X_test), cnn.predict_proba(X_test), atol=1e-6)
+
+
+def test_exp5_reuses_saved_cnn_only_for_same_data(url_split, tmp_path, monkeypatch):
+    from experiments import exp5_deep_learning as exp5
+    from phishing_detection import config
+
+    monkeypatch.setattr(config, "MODELS_DIR", tmp_path)
+    monkeypatch.setattr(exp5, "CharCNNClassifier", type(
+        "QuickCNN", (CharCNNClassifier,), {"__init__": lambda self, **kw: CharCNNClassifier.__init__(
+            self, **{"max_epochs": 1, "verbose": False, **kw})}))
+    X_train, X_test, y_train, y_test = url_split
+
+    _, first = exp5.fit_or_load_cnn("normalized", X_train, y_train, X_test, y_test)
+    saved = (tmp_path / "exp5_char_cnn_normalized.pt").stat().st_mtime_ns
+    _, second = exp5.fit_or_load_cnn("normalized", X_train, y_train, X_test, y_test)
+    assert (tmp_path / "exp5_char_cnn_normalized.pt").stat().st_mtime_ns == saved  # reused, not retrained
+    assert second["f1"] == first["f1"] and second["fit_seconds"] == first["fit_seconds"]
+
+    exp5.fit_or_load_cnn("normalized", X_train.iloc[1:], y_train.iloc[1:], X_test, y_test)
+    assert (tmp_path / "exp5_char_cnn_normalized.pt").stat().st_mtime_ns != saved  # data changed -> retrained

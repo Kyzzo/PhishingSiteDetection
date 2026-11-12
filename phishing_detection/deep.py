@@ -192,3 +192,25 @@ class CharCNNClassifier(ClassifierMixin, BaseEstimator):
 
     def n_parameters(self) -> int:
         return sum(p.numel() for p in self.model_.parameters())
+
+    def save(self, path, **meta) -> None:
+        """Save the trained weights and settings; extra keyword args are stored as metadata."""
+        import torch
+
+        torch.save({"params": self.get_params(), "state_dict": self.model_.state_dict(),
+                    "history": self.history_, "best_val_f1": self.best_val_f1_, "meta": meta}, path)
+
+    @classmethod
+    def load(cls, path):
+        """Rebuild a trained model from save(). Returns (model, metadata)."""
+        import torch
+
+        checkpoint = torch.load(path, map_location="cpu", weights_only=False)  # our own file, trusted
+        model = cls(**checkpoint["params"])
+        model.device_ = "cuda" if torch.cuda.is_available() else "cpu"
+        model.classes_ = np.array([0, 1])
+        model.model_ = model._build().to(model.device_)
+        model.model_.load_state_dict(checkpoint["state_dict"])
+        model.history_ = checkpoint["history"]
+        model.best_val_f1_ = checkpoint["best_val_f1"]
+        return model, checkpoint["meta"]
