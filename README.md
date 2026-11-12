@@ -93,12 +93,36 @@ Install note: `pip install -r requirements.txt` gets the CPU build of PyTorch, w
 `results/models/exp5_char_cnn_<mode>.pt` (gitignored, so each person trains once locally), and later runs
 reload it in seconds. A saved model is reused only if the training data, split and CNN settings are
 unchanged; otherwise it retrains automatically. Pass `--retrain` to force a fresh training run.
+## Feature sets
+
+Pick one with `load_split("full")` / `load_split("ablated")`, or change `config.FEATURE_SET`. Both use the
+same rows and the same train/test split.
+
+| Set | Features | Why |
+|-----|----------|-----|
+| `full` | all 50 | Comparable to the PhiUSIIL paper, but every model scores ~100% F1 |
+| `ablated` | 20 URL-string features, without `URLSimilarityIndex` and `IsHTTPS` | First set where the models differ |
+
+How the ablated set was chosen (5-fold CV on the training split only; the test set was not used):
+
+- `URLSimilarityIndex` alone, with one threshold, separates the classes at 99.7% accuracy.
+- Dropping it, or it plus the strongest page-content counts, barely helps: every model stays at 99.7–100% F1,
+  because the remaining features overlap so much.
+- Splitting by feature source does help. URL-string features without `URLSimilarityIndex` and `IsHTTPS`
+  give LR / DT / RF F1 of 0.973 / 0.990 / 0.994 (LR recall 0.951). This is also a realistic scenario,
+  classifying a link before loading the page, and it matches the input of the Experiment 5 text models.
+
+**Caveat.** Every legitimate URL starts with `https://www.`, and the remaining URL features still
+partly encode that prefix (a Random Forest predicts the prefix from them at 99.5% accuracy). Restricted
+to URLs that start with `https://www.`, where the prefix gives nothing away, a Random Forest on the URL
+features reaches only 0.83 F1. Report that subset as the hard evaluation; it is in line with the 0.87 F1
+the Experiment 5 text models reach on normalized URLs.
 
 ## Notes and caveats
 
-- Published results on PhiUSIIL report near-perfect accuracy. A few features, `URLSimilarityIndex` in
-  particular, separate the classes almost on their own. If every model scores about 99.9%, try an
-  ablation that drops the top one or two features. That makes the comparison between models more meaningful.
+- Published results on PhiUSIIL report near-perfect accuracy. The differences between classes come
+  partly from how the data was collected (legitimate sites are mostly top-ranked homepages), so no
+  feature list removes the shortcut completely. See "Feature sets" above.
 
 ## Reference
 
