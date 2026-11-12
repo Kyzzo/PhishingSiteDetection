@@ -56,18 +56,34 @@ def split_features_target(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
     return df.drop(columns=[config.TARGET]), df[config.TARGET]
 
 
-def train_test(df: pd.DataFrame):
+def select_feature_set(x: pd.DataFrame, feature_set: str | None = None) -> pd.DataFrame:
+    """Keep the columns of config.FEATURE_SETS[feature_set] (default config.FEATURE_SET)."""
+    name = feature_set or config.FEATURE_SET
+    if name not in config.FEATURE_SETS:
+        raise ValueError(f"Unknown feature set '{name}'. Choose from {list(config.FEATURE_SETS)}.")
+    columns = config.FEATURE_SETS[name]
+    if columns is None:
+        return x
+    missing = [c for c in columns if c not in x.columns]
+    if missing:
+        raise KeyError(f"Feature set '{name}' needs columns that are missing: {missing}")
+    return x[columns]
+
+
+def train_test(df: pd.DataFrame, feature_set: str | None = None):
     """Stratified train/test split. Returns X_train, X_test, y_train, y_test.
 
     Use config.TEST_SIZE and config.RANDOM_STATE so everyone gets the same split.
-    Hint: sklearn.model_selection.train_test_split(..., stratify=y)
+    feature_set picks the columns ("full" or "ablated"; default config.FEATURE_SET). The rows,
+    and so the split, are identical for every feature set.
     """
     x, y = split_features_target(df)
+    x = select_feature_set(x, feature_set)
     return train_test_split(x, y, test_size=config.TEST_SIZE, random_state=config.RANDOM_STATE, stratify=y)
 
 
-def load_split():
+def load_split(feature_set: str | None = None):
     """Convenience: load raw data, clean it, and return the stratified split."""
     from phishing_detection.data import load_raw
 
-    return train_test(clean(load_raw()))
+    return train_test(clean(load_raw()), feature_set)
