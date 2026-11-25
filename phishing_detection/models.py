@@ -4,15 +4,13 @@ Owner: Paul (Week 1). Tests: tests/test_pipeline.py::test_models_fit_and_evaluat
 """
 from sklearn.pipeline import Pipeline
 
-from phishing_detection import config  # noqa: F401  (use config.RANDOM_STATE / N_JOBS)
+from phishing_detection import config
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 
-from phishing_detection import config
 
 def get_models() -> dict[str, Pipeline]:
     """Return fresh, default (untuned) models keyed by name.
@@ -25,22 +23,16 @@ def get_models() -> dict[str, Pipeline]:
     also needs a scaling step inside its pipeline, so scaling is fit only on
     training folds during cross-validation.
     """
-    # TODO: implement
-    return {
-        "logistic_regression": Pipeline(
-            steps=[
-                ("scaler", StandardScaler()),
-                ("clf", LogisticRegression(max_iter=1000, random_state=config.RANDOM_STATE)),
-            ]
-        ),
-        "decision_tree": Pipeline(
-            steps=[
-                ("clf", DecisionTreeClassifier(random_state=config.RANDOM_STATE)),
-            ]
-        ),
-        "random_forest": Pipeline(
-            steps=[
-                ("clf", RandomForestClassifier(random_state=config.RANDOM_STATE, n_jobs=config.N_JOBS)),
-            ]
-        ),
+
+    return{
+        "logistic_regression": Pipeline(steps=[
+            ("scaler", StandardScaler()),
+            ("clf", LogisticRegression(max_iter=1000, random_state=config.RANDOM_STATE)),
+        ]),
+        "decision_tree": Pipeline(steps=[
+            ("clf", DecisionTreeClassifier(random_state=config.RANDOM_STATE)),
+        ]),
+        "random_forest": Pipeline(steps=[
+            ("clf", RandomForestClassifier(random_state=config.RANDOM_STATE, n_jobs=config.N_JOBS)),
+        ]),
     }
